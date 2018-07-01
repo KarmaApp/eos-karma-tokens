@@ -1,0 +1,12 @@
+{
+  "chainId":"038f4b0fc8ff18a4f0842a8f0564611f6e96e8535901dd45e43ac8691a1c4dca",
+  "network":"http://207.246.118.107:8888",
+  "tokenAccount":"therealkarmc",
+  "privateKey":"YOUR_PK_HERE",
+  "symbol":"KARMA",
+  "ratio":6,
+  "memo":"Karma Fairdrop - Life is beautiful, beautiful, beautiful, beautiful!",
+  "batchSize":25,
+  "limitCap":250000,
+  "decimals":4
+}
