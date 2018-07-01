@@ -1,4 +1,6 @@
+.DS_Store
+.idea
+.vscode
+
 *.wast
 *.wasm
-.vscode
-.DS_Store
