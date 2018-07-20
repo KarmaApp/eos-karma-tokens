@@ -1,0 +1,20 @@
+{
+  "name": "karma-tokens-api",
+  "version": "1.0.0",
+  "description": "API data for Tokens, Supply, currency stats for Coin Market Cap etc",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Leo Ribeiro",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.18.0",
+    "express": "^4.16.3",
+    "morgan": "^1.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^1.18.3"
+  }
+}
