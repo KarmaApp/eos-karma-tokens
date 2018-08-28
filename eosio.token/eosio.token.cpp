@@ -100,6 +100,93 @@ void token::transfer( account_name from,
     add_balance( to, quantity, from );
 }
 
+void token::powerup( account_name owner, asset quantity ) {
+  require_auth( owner );
+  auto sym = quantity.symbol;
+  eosio_assert( sym.is_valid(), "invalid symbol name" );
+  eosio_assert( sym == token::_symbol, "you can only power up with KARMA" );
+  eosio_assert( quantity.amount > 0, "must specify positive quantity" );
+  power owner_power( _self, owner );
+  sub_balance( owner, quantity );
+  auto to = owner_power.find( quantity.symbol.name() );
+  if( to == owner_power.end() ) {
+     //first powerup
+     owner_power.emplace( owner, [&]( auto& a ){
+       a.weight = quantity;
+       a.last_claim_time = now();
+     });
+  } else {
+     //do a prorated claim to reward current power, then increase power.
+     //claim timer resets, will be increased reward at that time
+     do_claim(owner, true);
+     owner_power.modify( to, 0, [&]( auto& a ) {
+       a.weight += quantity;
+       a.last_claim_time = now();
+     });
+  }
+}
+void token::powerdown( account_name owner, asset quantity ) {
+  require_auth( owner );
+  auto sym = quantity.symbol;
+  eosio_assert( sym.is_valid(), "invalid symbol name" );
+  eosio_assert( sym == token::_symbol, "you can only power down KARMA" );
+  eosio_assert( quantity.amount > 0, "must specify positive quantity" );
+  power owner_power( _self, owner );
+  const auto& from = owner_power.get( quantity.symbol.name(), "no KARMA power found" );
+  eosio_assert( from.weight.amount >= quantity.amount, "you dont have that much KARMA power" );
+  if( from.weight.amount == quantity.amount ) {
+     //no prorated claim... it's forfeit for not waiting to claim
+     owner_power.erase( from );
+  } else {
+     owner_power.modify( from, owner, [&]( auto& a ) {
+         //we don't do a prorated claim for powerdown
+         //when they can claim they get reduced rewards... fair for powering down
+         a.weight -= quantity;
+     });
+  }
+
+  //create a refunding state
+  refunding owner_refund( _self, owner );
+  auto to = owner_refund.find( quantity.symbol.name() );
+  if( to == owner_refund.end() ) {
+     owner_refund.emplace( owner, [&]( auto& a ){
+       a.quantity = quantity;
+       a.request_time = now();
+     });
+  } else {
+     owner_refund.modify( to, 0, [&]( auto& a ) {
+       a.quantity += quantity;
+       a.request_time = now();
+     });
+  }
+
+  //send deferred refund action
+  eosio::transaction out;
+  out.actions.emplace_back( permission_level{ owner, N(active) }, _self, N(refund), owner );
+  out.delay_sec = token::refund_delay;
+  cancel_deferred( owner ); // TODO: Remove this line when replacing deferred trxs is fixed
+  out.send( owner, owner, true );
+}
+void token::claim( account_name owner ) {
+  require_auth( owner );
+  do_claim( owner, false );
+}
+
+void token::refund( account_name owner ) {
+  require_auth( owner );
+  refunding owner_refund( _self, owner );
+  const auto& from = owner_refund.get( token::_symbol.name(), "no KARMA refund found" );
+  eosio_assert(now() <= from.request_time + token::refund_delay, "refund not available yet");
+  eosio_assert(from.quantity.amount > 0, "refund must be positive");
+  add_balance(owner, from.quantity, owner);
+  owner_refund.erase( from );
+
+}
+
+void token::do_claim( account_name owner, bool prorate ) {
+  //create inflation
+}
+
 void token::sub_balance( account_name owner, asset value ) {
    accounts from_acnts( _self, owner );
 
