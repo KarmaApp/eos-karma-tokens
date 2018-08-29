@@ -33,6 +33,42 @@
         }
       ]
     },{
+      "name": "power_st",
+      "base": "",
+      "fields": [{
+          "name": "weight",
+          "type": "asset"
+        },{
+          "name": "last_claim_time",
+          "type": "uint64"
+        }
+      ]
+    },{
+      "name": "refund_st",
+      "base": "",
+      "fields": [{
+          "name": "quantity",
+          "type": "asset"
+        },{
+          "name": "request_time",
+          "type": "uint64"
+        }
+      ]
+    },{
+      "name": "global_st",
+      "base": "",
+      "fields": [{
+          "name": "power_pool",
+          "type": "asset"
+        },{
+          "name": "total_power",
+          "type": "asset"
+        },{
+          "name": "last_filled_time",
+          "type": "uint64"
+        }
+      ]
+    },{
       "name": "create",
       "base": "",
       "fields": [{
@@ -82,6 +118,44 @@
           "type": "string"
         }
       ]
+    },{
+      "name": "powerup",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "quantity",
+          "type": "asset"
+        }
+      ]
+    },{
+      "name": "powerdown",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        },{
+          "name": "quantity",
+          "type": "asset"
+        }
+      ]
+    },{
+      "name": "claim",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        }
+      ]
+    },{
+      "name": "refund",
+      "base": "",
+      "fields": [{
+          "name": "owner",
+          "type": "name"
+        }
+      ]
     }
   ],
   "actions": [{
@@ -99,6 +173,22 @@
     },{
       "name": "transfer",
       "type": "transfer",
+      "ricardian_contract": ""
+    },{
+      "name": "powerup",
+      "type": "powerup",
+      "ricardian_contract": ""
+    },{
+      "name": "powerdown",
+      "type": "powerdown",
+      "ricardian_contract": ""
+    },{
+      "name": "claim",
+      "type": "claim",
+      "ricardian_contract": ""
+    },{
+      "name": "refund",
+      "type": "refund",
       "ricardian_contract": ""
     }
   ],
@@ -122,6 +212,30 @@
         "asset"
       ],
       "type": "stat"
+    },{
+      "name": "power",
+      "index_type": "i64",
+      "key_names": [
+        "weight"
+      ],
+      "key_types": [
+        "asset"
+      ],
+      "type": "power_st"
+    },{
+      "name": "refunding",
+      "index_type": "i64",
+      "key_names": [
+        "quantity"
+      ],
+      "key_types": [
+        "asset"
+      ],
+      "type": "refund_st"
+    },{
+      "name": "global",
+      "index_type": "i64",
+      "type": "global_st"
     }
   ],
   "ricardian_clauses": [],

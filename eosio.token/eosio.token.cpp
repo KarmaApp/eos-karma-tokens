@@ -118,15 +118,15 @@ void token::powerup( account_name owner, asset quantity ) {
      //first powerup
      owner_power.emplace( owner, [&]( auto& a ){
        a.weight = quantity;
-       a.last_claim_time = now();
+       a.last_claim_time = current_time();
      });
   } else {
      //do a prorated claim to reward current power, then increase power.
      //claim timer resets, will be increased reward at that time
-     do_claim(owner, true);
+     //do_claim(owner, true);
      owner_power.modify( to, 0, [&]( auto& a ) {
        a.weight += quantity;
-       a.last_claim_time = now();
+       a.last_claim_time = current_time();
      });
   }
   //finally increase global power
@@ -161,12 +161,12 @@ void token::powerdown( account_name owner, asset quantity ) {
   if( to == owner_refund.end() ) {
      owner_refund.emplace( owner, [&]( auto& a ){
        a.quantity = quantity;
-       a.request_time = now();
+       a.request_time = current_time();
      });
   } else {
      owner_refund.modify( to, 0, [&]( auto& a ) {
        a.quantity += quantity;
-       a.request_time = now();
+       a.request_time = current_time();
      });
   }
 
@@ -186,7 +186,7 @@ void token::refund( account_name owner ) {
   require_auth( owner );
   refunding owner_refund( _self, owner );
   const auto& from = owner_refund.get( token::SYMBOL.name(), "no KARMA refund found" );
-  eosio_assert(now() <= from.request_time + token::refund_delay, "refund not available yet");
+  eosio_assert(current_time() <= from.request_time + token::refund_delay, "refund not available yet");
   eosio_assert(from.quantity.amount > 0, "refund must be positive");
   add_balance(owner, from.quantity, owner);
   owner_refund.erase( from );
@@ -199,6 +199,11 @@ void token::do_claim( account_name owner, bool prorate ) {
 
   auto ct = current_time();
   double proration = 1.0;
+
+  eosio::print("Current time: ", ct,"\n");
+  eosio::print("Last claim time: ", from.last_claim_time,"\n");
+  eosio::print("Delay time: ", token::claim_delay,"\n");
+  eosio::print("Spread time: ", ct - from.last_claim_time,"\n");
 
   //check timing vs proration
   if(!prorate) {
@@ -213,12 +218,14 @@ void token::do_claim( account_name owner, bool prorate ) {
   //create inflation
   auto new_tokens = static_cast<int64_t>( (continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
   auto to_power = (new_tokens / 5) * 2; //2% actual inflation
-  _global.power_pool += asset(to_power,token::SYMBOL);
-  _global.last_filled_time = ct;
+  //_global.power_pool += asset(to_power,token::SYMBOL);
+  //_global.last_filled_time = ct;
+  eosio::print("Create inflation: ", to_power,"\n");
 
   //award tokens
   auto reward = static_cast<int64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
-  add_balance(owner,asset(reward,token::SYMBOL),owner);
+  //add_balance(owner,asset(reward,token::SYMBOL),owner);
+  eosio::print("Reward: ", reward,"\n");
 }
 
 void token::sub_balance( account_name owner, asset value ) {
@@ -252,4 +259,4 @@ void token::add_balance( account_name owner, asset value, account_name ram_payer
    }
 }
 
-EOSIO_ABI( token, (create)(unlock)(issue)(transfer) )
+EOSIO_ABI( token, (create)(unlock)(issue)(transfer)(powerup)(powerdown)(claim)(refund) )
