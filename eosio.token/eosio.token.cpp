@@ -5,6 +5,11 @@
 
 #include "eosio.token.hpp"
 
+//inflation parameters
+const double   continuous_rate       = 0.04879;          // 5% annual rate
+const uint32_t seconds_per_year      = 52*7*24*3600;
+const uint64_t useconds_per_year     = seconds_per_year*1000000ll;
+
 void token::create( account_name issuer,
                     asset        maximum_supply )
 {
@@ -104,7 +109,7 @@ void token::powerup( account_name owner, asset quantity ) {
   require_auth( owner );
   auto sym = quantity.symbol;
   eosio_assert( sym.is_valid(), "invalid symbol name" );
-  eosio_assert( sym == token::_symbol, "you can only power up with KARMA" );
+  eosio_assert( sym == token::SYMBOL, "you can only power up with KARMA" );
   eosio_assert( quantity.amount > 0, "must specify positive quantity" );
   power owner_power( _self, owner );
   sub_balance( owner, quantity );
@@ -124,12 +129,14 @@ void token::powerup( account_name owner, asset quantity ) {
        a.last_claim_time = now();
      });
   }
+  //finally increase global power
+  _global.total_power += quantity;
 }
 void token::powerdown( account_name owner, asset quantity ) {
   require_auth( owner );
   auto sym = quantity.symbol;
   eosio_assert( sym.is_valid(), "invalid symbol name" );
-  eosio_assert( sym == token::_symbol, "you can only power down KARMA" );
+  eosio_assert( sym == token::SYMBOL, "you can only power down KARMA" );
   eosio_assert( quantity.amount > 0, "must specify positive quantity" );
   power owner_power( _self, owner );
   const auto& from = owner_power.get( quantity.symbol.name(), "no KARMA power found" );
@@ -144,6 +151,9 @@ void token::powerdown( account_name owner, asset quantity ) {
          a.weight -= quantity;
      });
   }
+
+  //decrease global power
+  _global.total_power -= quantity;
 
   //create a refunding state
   refunding owner_refund( _self, owner );
@@ -175,7 +185,7 @@ void token::claim( account_name owner ) {
 void token::refund( account_name owner ) {
   require_auth( owner );
   refunding owner_refund( _self, owner );
-  const auto& from = owner_refund.get( token::_symbol.name(), "no KARMA refund found" );
+  const auto& from = owner_refund.get( token::SYMBOL.name(), "no KARMA refund found" );
   eosio_assert(now() <= from.request_time + token::refund_delay, "refund not available yet");
   eosio_assert(from.quantity.amount > 0, "refund must be positive");
   add_balance(owner, from.quantity, owner);
@@ -184,7 +194,31 @@ void token::refund( account_name owner ) {
 }
 
 void token::do_claim( account_name owner, bool prorate ) {
+  power owner_power( _self, owner );
+  const auto& from = owner_power.get( token::SYMBOL.name(), "no KARMA power found" );
+
+  auto ct = current_time();
+  double proration = 1.0;
+
+  //check timing vs proration
+  if(!prorate) {
+    eosio_assert(ct - from.last_claim_time > token::claim_delay, "you must wait seven days from last claim or powerup");
+  } else {
+    proration = double(ct - from.last_claim_time) / double(token::claim_delay);
+  }
+
+  const auto usecs_since_last_fill     = ct - _global.last_filled_time;
+  const asset token_supply = get_supply(token::SYMBOL.name());
+
   //create inflation
+  auto new_tokens = static_cast<int64_t>( (continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
+  auto to_power = (new_tokens / 5) * 2; //2% actual inflation
+  _global.power_pool += asset(to_power,token::SYMBOL);
+  _global.last_filled_time = ct;
+
+  //award tokens
+  auto reward = static_cast<int64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
+  add_balance(owner,asset(reward,token::SYMBOL),owner);
 }
 
 void token::sub_balance( account_name owner, asset value ) {

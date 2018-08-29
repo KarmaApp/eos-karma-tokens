@@ -15,8 +15,9 @@ using std::string;
 
 class token : public contract {
 
-  static constexpr time refund_delay = 3*24*3600;   // 3 days
-  const uint64_t REQUIRED_STAKE_DURATION = 7*24*3600; // 7 days
+  const symbol_type       SYMBOL        = S(4,KARMA);
+  static constexpr time   refund_delay  = 3*24*3600; // 3 days
+  const uint64_t          claim_delay   = 7*24*3600; // 7 days
 
   public:
       token( account_name self ):contract(self),_global_singleton(_self,_self){
@@ -46,7 +47,7 @@ class token : public contract {
       inline asset get_balance( account_name owner, symbol_name sym )const;
 
   private:
-      symbol_type _symbol = S(4,KARMA);
+
       // @abi table accounts i64
       struct account {
         asset    balance;
