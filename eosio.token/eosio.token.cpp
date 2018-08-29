@@ -9,6 +9,12 @@
 const double   continuous_rate       = 0.04879;          // 5% annual rate
 const uint32_t seconds_per_year      = 52*7*24*3600;
 const uint64_t useconds_per_year     = seconds_per_year*1000000ll;
+//claim parameters
+const uint32_t seconds_claim_delay   = 1800;//7*24*3600;       // 7 days TODO TEST ONLY
+const uint64_t useconds_claim_delay  = seconds_claim_delay*1000000ll;
+//refund parameters
+static constexpr time   seconds_refund_delay = 900;//3*24*3600; // 3 days TODO TEST ONLY
+const uint64_t         useconds_refund_delay = seconds_refund_delay*1000000ll;
 
 void token::create( account_name issuer,
                     asset        maximum_supply )
@@ -123,7 +129,7 @@ void token::powerup( account_name owner, asset quantity ) {
   } else {
      //do a prorated claim to reward current power, then increase power.
      //claim timer resets, will be increased reward at that time
-     //do_claim(owner, true);
+     do_claim(owner, true);
      owner_power.modify( to, 0, [&]( auto& a ) {
        a.weight += quantity;
        a.last_claim_time = current_time();
@@ -173,7 +179,7 @@ void token::powerdown( account_name owner, asset quantity ) {
   //send deferred refund action
   eosio::transaction out;
   out.actions.emplace_back( permission_level{ owner, N(active) }, _self, N(refund), owner );
-  out.delay_sec = token::refund_delay;
+  out.delay_sec = seconds_refund_delay;
   cancel_deferred( owner ); // TODO: Remove this line when replacing deferred trxs is fixed
   out.send( owner, owner, true );
 }
@@ -184,13 +190,14 @@ void token::claim( account_name owner ) {
 
 void token::refund( account_name owner ) {
   require_auth( owner );
+  eosio::print("Attempting refund"); //TODO Remove
   refunding owner_refund( _self, owner );
   const auto& from = owner_refund.get( token::SYMBOL.name(), "no KARMA refund found" );
-  eosio_assert(current_time() <= from.request_time + token::refund_delay, "refund not available yet");
+  eosio_assert(from.request_time + useconds_refund_delay <= current_time(), "refund not available yet");
   eosio_assert(from.quantity.amount > 0, "refund must be positive");
   add_balance(owner, from.quantity, owner);
   owner_refund.erase( from );
-
+  eosio::print("\nRefund success"); //TODO Remove
 }
 
 void token::do_claim( account_name owner, bool prorate ) {
@@ -200,32 +207,43 @@ void token::do_claim( account_name owner, bool prorate ) {
   auto ct = current_time();
   double proration = 1.0;
 
-  eosio::print("Current time: ", ct,"\n");
-  eosio::print("Last claim time: ", from.last_claim_time,"\n");
-  eosio::print("Delay time: ", token::claim_delay,"\n");
-  eosio::print("Spread time: ", ct - from.last_claim_time,"\n");
+  eosio::print("Current time: ", ct,"\n"); //TODO Remove
+  eosio::print("Last claim time: ", from.last_claim_time,"\n"); //TODO Remove
+  eosio::print("Delay time: ", useconds_claim_delay,"\n"); //TODO Remove
+  eosio::print("Shortage: ", ct - from.last_claim_time,"\n"); //TODO Remove
 
   //check timing vs proration
   if(!prorate) {
-    eosio_assert(ct - from.last_claim_time > token::claim_delay, "you must wait seven days from last claim or powerup");
+    eosio_assert(ct - from.last_claim_time > useconds_claim_delay, "you must wait seven days from last claim or powerup");
   } else {
-    proration = double(ct - from.last_claim_time) / double(token::claim_delay);
+    proration = double(ct - from.last_claim_time) / double(useconds_claim_delay);
   }
 
-  const auto usecs_since_last_fill     = ct - _global.last_filled_time;
-  const asset token_supply = get_supply(token::SYMBOL.name());
+  eosio::print("Proration: ", proration, "\n");
+
+  const auto usecs_since_last_fill = ct - _global.last_filled_time;
+  const asset token_supply         = get_supply(token::SYMBOL.name());
 
   //create inflation
   auto new_tokens = static_cast<int64_t>( (continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
-  auto to_power = (new_tokens / 5) * 2; //2% actual inflation
-  //_global.power_pool += asset(to_power,token::SYMBOL);
-  //_global.last_filled_time = ct;
-  eosio::print("Create inflation: ", to_power,"\n");
+  //20% of real inflation goes to power pool
+  auto to_power = (new_tokens / 5) * 2; //TODO confirm this number
+  _global.power_pool += asset(to_power,token::SYMBOL);
+  _global.last_filled_time = ct;
+  eosio::print("Create inflation: ", to_power,"\n"); //TODO Remove
 
   //award tokens
   auto reward = static_cast<int64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
-  //add_balance(owner,asset(reward,token::SYMBOL),owner);
-  eosio::print("Reward: ", reward,"\n");
+  add_balance(owner,asset(reward,token::SYMBOL),owner);
+
+  //reduce pool
+  _global.power_pool -= asset(reward,token::SYMBOL);
+
+  //we will remove inflation from self
+  //this is because the pre-app staking isn't real inflation
+  //but is being funded from the KARMA supply
+  sub_balance(_self, asset(reward,token::SYMBOL));
+  eosio::print("Reward: ", reward,"\n"); //TODO Remove
 }
 
 void token::sub_balance( account_name owner, asset value ) {
@@ -233,7 +251,6 @@ void token::sub_balance( account_name owner, asset value ) {
 
    const auto& from = from_acnts.get( value.symbol.name(), "no balance object found" );
    eosio_assert( from.balance.amount >= value.amount, "overdrawn balance" );
-
 
    if( from.balance.amount == value.amount ) {
       from_acnts.erase( from );

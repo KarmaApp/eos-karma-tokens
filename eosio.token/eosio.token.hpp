@@ -14,10 +14,8 @@ using namespace eosio;
 using std::string;
 
 class token : public contract {
-
-  const symbol_type       SYMBOL        = S(4,KARMA);
-  static constexpr time   refund_delay  = 3*24*3600; // 3 days
-  const uint64_t          claim_delay   = 7*24*3600*1000000ll; // 7 days
+  //token parameters
+  const symbol_type       SYMBOL       = S(4,KARMA);
 
   public:
       token( account_name self ):contract(self),_global_singleton(_self,_self){
