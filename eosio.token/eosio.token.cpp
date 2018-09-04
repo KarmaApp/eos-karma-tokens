@@ -7,6 +7,7 @@
 
 //inflation parameters
 const double   continuous_rate       = 0.04879;          // 5% annual rate
+const double   staking_share         = 0.4;              // 40% goes to staking reward - this will shrink when app deploys
 const uint32_t seconds_per_year      = 52*7*24*3600;
 const uint64_t useconds_per_year     = seconds_per_year*1000000ll;
 //claim parameters
@@ -225,12 +226,11 @@ void token::do_claim( account_name owner, bool prorate ) {
   const asset token_supply         = get_supply(token::SYMBOL.name());
 
   //create inflation
-  auto new_tokens = static_cast<int64_t>( (continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
-  //20% of real inflation goes to power pool
-  auto to_power = (new_tokens / 5) * 2; //TODO confirm this number
-  _global.power_pool += asset(to_power,token::SYMBOL);
+  auto new_tokens = static_cast<int64_t>( (staking_share * continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
+
+  _global.power_pool += asset(new_tokens,token::SYMBOL);
   _global.last_filled_time = ct;
-  eosio::print("Create inflation: ", to_power,"\n"); //TODO Remove
+  eosio::print("Create inflation: ", new_tokens,"\n"); //TODO Remove
 
   //award tokens
   auto reward = static_cast<int64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
