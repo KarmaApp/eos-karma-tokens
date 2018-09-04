@@ -7,7 +7,7 @@
 
 //inflation parameters
 const double   continuous_rate       = 0.04879;          // 5% annual rate
-const double   staking_share         = 0.8;              // 40% goes to staking reward - this will shrink when app deploys
+const double   staking_share         = 0.8;              // 80% goes to staking reward - this will shrink to 15% when app deploys
 const uint32_t seconds_per_year      = 52*7*24*3600;
 const uint64_t useconds_per_year     = seconds_per_year*1000000ll;
 //claim parameters
