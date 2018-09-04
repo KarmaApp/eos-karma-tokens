@@ -19,7 +19,11 @@ class token : public contract {
 
   public:
       token( account_name self ):contract(self),_global_singleton(_self,_self){
-        _global = _global_singleton.exists() ? _global_singleton.get() : global{asset(0,SYMBOL),asset(0,SYMBOL),0};
+        _global = _global_singleton.exists() ? _global_singleton.get() : global{
+          asset(0,SYMBOL),
+          asset(0,SYMBOL),
+          current_time()
+        };
       }
 
       ~token() {

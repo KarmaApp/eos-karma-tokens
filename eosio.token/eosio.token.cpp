@@ -208,10 +208,16 @@ void token::do_claim( account_name owner, bool prorate ) {
   auto ct = current_time();
   double proration = 1.0;
 
+
+
   eosio::print("Current time: ", ct,"\n"); //TODO Remove
   eosio::print("Last claim time: ", from.last_claim_time,"\n"); //TODO Remove
   eosio::print("Delay time: ", useconds_claim_delay,"\n"); //TODO Remove
   eosio::print("Shortage: ", ct - from.last_claim_time,"\n"); //TODO Remove
+
+  if(_global.last_filled_time == 0) {
+    _global.last_filled_time = ct;
+  }
 
   //check timing vs proration
   if(!prorate) {
@@ -219,6 +225,10 @@ void token::do_claim( account_name owner, bool prorate ) {
   } else {
     proration = double(ct - from.last_claim_time) / double(useconds_claim_delay);
   }
+
+  owner_power.modify( from, 0, [&]( auto& a ) {
+    a.last_claim_time = ct;
+  });
 
   eosio::print("Proration: ", proration, "\n");
 
