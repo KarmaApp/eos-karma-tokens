@@ -48,8 +48,9 @@ class token : public contract {
       void claim( account_name owner );
       void refund( account_name owner );
 
-      inline asset get_supply( symbol_name sym )const;
+      void rewarded( account_name to, asset quantity, string memo );
 
+      inline asset get_supply( symbol_name sym )const;
       inline asset get_balance( account_name owner, symbol_name sym )const;
 
   private:

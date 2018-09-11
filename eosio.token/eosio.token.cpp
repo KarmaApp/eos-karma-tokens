@@ -11,10 +11,10 @@ const double   staking_share         = 0.8;              // 80% goes to staking 
 const uint32_t seconds_per_year      = 52*7*24*3600;
 const uint64_t useconds_per_year     = seconds_per_year*1000000ll;
 //claim parameters
-const uint32_t seconds_claim_delay   = 1800;//7*24*3600;       // 7 days TODO TEST ONLY
+const uint32_t seconds_claim_delay   = 7*24*3600;       // 7 days
 const uint64_t useconds_claim_delay  = seconds_claim_delay*1000000ll;
 //refund parameters
-static constexpr time   seconds_refund_delay = 900;//3*24*3600; // 3 days TODO TEST ONLY
+static constexpr time   seconds_refund_delay = 3*24*3600; // 3 days
 const uint64_t         useconds_refund_delay = seconds_refund_delay*1000000ll;
 
 void token::create( account_name issuer,
@@ -184,6 +184,7 @@ void token::powerdown( account_name owner, asset quantity ) {
   cancel_deferred( owner ); // TODO: Remove this line when replacing deferred trxs is fixed
   out.send( owner, owner, true );
 }
+
 void token::claim( account_name owner ) {
   require_auth( owner );
   do_claim( owner, false );
@@ -191,29 +192,28 @@ void token::claim( account_name owner ) {
 
 void token::refund( account_name owner ) {
   require_auth( owner );
-  eosio::print("Attempting refund"); //TODO Remove
+  //eosio::print("Attempting refund"); //TODO Remove
   refunding owner_refund( _self, owner );
   const auto& from = owner_refund.get( token::SYMBOL.name(), "no KARMA refund found" );
   eosio_assert(from.request_time + useconds_refund_delay <= current_time(), "refund not available yet");
   eosio_assert(from.quantity.amount > 0, "refund must be positive");
   add_balance(owner, from.quantity, owner);
   owner_refund.erase( from );
-  eosio::print("\nRefund success"); //TODO Remove
+  //eosio::print("\nRefund success"); //TODO Remove
 }
 
 void token::do_claim( account_name owner, bool prorate ) {
   power owner_power( _self, owner );
   const auto& from = owner_power.get( token::SYMBOL.name(), "no KARMA power found" );
+  const auto memo = std::string(prorate ? "Thanks for POWERING UP more KARMA! Here's your prorated POWER UP reward." : "Thanks for POWERING UP with KARMA! Here's your POWER UP reward.");
 
   auto ct = current_time();
   double proration = 1.0;
 
-
-
-  eosio::print("Current time: ", ct,"\n"); //TODO Remove
-  eosio::print("Last claim time: ", from.last_claim_time,"\n"); //TODO Remove
-  eosio::print("Delay time: ", useconds_claim_delay,"\n"); //TODO Remove
-  eosio::print("Shortage: ", ct - from.last_claim_time,"\n"); //TODO Remove
+  // eosio::print("Current time: ", ct,"\n"); //TODO Remove
+  // eosio::print("Last claim time: ", from.last_claim_time,"\n"); //TODO Remove
+  // eosio::print("Delay time: ", useconds_claim_delay,"\n"); //TODO Remove
+  // eosio::print("Shortage: ", ct - from.last_claim_time,"\n"); //TODO Remove
 
   if(_global.last_filled_time == 0) {
     _global.last_filled_time = ct;
@@ -230,31 +230,43 @@ void token::do_claim( account_name owner, bool prorate ) {
     a.last_claim_time = ct;
   });
 
-  eosio::print("Proration: ", proration, "\n");
+  // eosio::print("Proration: ", proration, "\n");
 
   const auto usecs_since_last_fill = ct - _global.last_filled_time;
   const asset token_supply         = get_supply(token::SYMBOL.name());
 
   //create inflation
-  auto new_tokens = static_cast<int64_t>( (staking_share * continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
+  auto new_tokens = static_cast<uint64_t>( (staking_share * continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
 
   _global.power_pool += asset(new_tokens,token::SYMBOL);
   _global.last_filled_time = ct;
-  eosio::print("Create inflation: ", new_tokens,"\n"); //TODO Remove
+
+  // eosio::print("Create inflation: ", new_tokens,"\n"); //TODO Remove
+  // eosio::print("Pool: ", _global.power_pool,"\n"); //TODO Remove
 
   //award tokens
-  auto reward = static_cast<int64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
+  auto reward = static_cast<uint64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
+  eosio_assert(reward > 0, "you must have a reward greater than zero"); //extreme edge case that probably will never happen
   add_balance(owner,asset(reward,token::SYMBOL),owner);
 
   //reduce pool
+  eosio_assert(reward <= _global.power_pool.amount, "power pool too small"); //extreme edge case that probably will never happen
   _global.power_pool -= asset(reward,token::SYMBOL);
 
   //we will remove inflation from self
   //this is because the pre-app staking isn't real inflation
   //but is being funded from the KARMA supply
   sub_balance(_self, asset(reward,token::SYMBOL));
-  eosio::print("Reward: ", reward,"\n"); //TODO Remove
+  // eosio::print("Reward: ", reward,"\n"); //TODO Remove
+
+  action(
+    permission_level{ _self, N(active) },
+    _self, N(rewarded),
+    std::make_tuple(owner, asset(reward,token::SYMBOL), memo)
+  ).send();
 }
+
+void token::rewarded( account_name to, asset quantity, string memo ){};
 
 void token::sub_balance( account_name owner, asset value ) {
    accounts from_acnts( _self, owner );
@@ -286,4 +298,4 @@ void token::add_balance( account_name owner, asset value, account_name ram_payer
    }
 }
 
-EOSIO_ABI( token, (create)(unlock)(issue)(transfer)(powerup)(powerdown)(claim)(refund) )
+EOSIO_ABI( token, (create)(unlock)(issue)(transfer)(powerup)(powerdown)(claim)(refund)(rewarded) )

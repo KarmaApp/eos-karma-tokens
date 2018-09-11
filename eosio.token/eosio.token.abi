@@ -190,6 +190,10 @@
       "name": "refund",
       "type": "refund",
       "ricardian_contract": ""
+    },{
+      "name": "rewarded",
+      "type": "issue",
+      "ricardian_contract": ""
     }
   ],
   "tables": [{
