@@ -246,24 +246,28 @@ void token::do_claim( account_name owner, bool prorate ) {
 
   //award tokens
   auto reward = static_cast<uint64_t>((proration * double(from.weight.amount) * double(_global.power_pool.amount)) / double(_global.total_power.amount));
-  eosio_assert(reward > 0, "you must have a reward greater than zero"); //extreme edge case that probably will never happen
-  add_balance(owner,asset(reward,token::SYMBOL),owner);
 
-  //reduce pool
-  eosio_assert(reward <= _global.power_pool.amount, "power pool too small"); //extreme edge case that probably will never happen
-  _global.power_pool -= asset(reward,token::SYMBOL);
+  eosio_assert(reward > 0 || prorate, "you must have a reward greater than zero"); //extreme edge case that probably will never happen
 
-  //we will remove inflation from self
-  //this is because the pre-app staking isn't real inflation
-  //but is being funded from the KARMA supply
-  sub_balance(_self, asset(reward,token::SYMBOL));
-  // eosio::print("Reward: ", reward,"\n"); //TODO Remove
+  if(reward > 0) {
+    add_balance(owner,asset(reward,token::SYMBOL),owner);
 
-  action(
-    permission_level{ _self, N(notify) },
-    _self, N(rewarded),
-    std::make_tuple(owner, asset(reward,token::SYMBOL), memo)
-  ).send();
+    //reduce pool
+    eosio_assert(reward <= _global.power_pool.amount, "power pool too small"); //extreme edge case that probably will never happen
+    _global.power_pool -= asset(reward,token::SYMBOL);
+
+    //we will remove inflation from self
+    //this is because the pre-app staking isn't real inflation
+    //but is being funded from the KARMA supply
+    sub_balance(_self, asset(reward,token::SYMBOL));
+    // eosio::print("Reward: ", reward,"\n"); //TODO Remove
+
+    action(
+      permission_level{ _self, N(notify) },
+      _self, N(rewarded),
+      std::make_tuple(owner, asset(reward,token::SYMBOL), memo)
+    ).send();
+  }
 }
 
 void token::rewarded( account_name to, asset quantity, string memo ){};
