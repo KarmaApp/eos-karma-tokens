@@ -179,7 +179,7 @@ void token::powerdown( account_name owner, asset quantity ) {
 
   //send deferred refund action
   eosio::transaction out;
-  out.actions.emplace_back( permission_level{ owner, N(active) }, _self, N(refund), owner );
+  out.actions.emplace_back( permission_level{ _self, N(notify) }, _self, N(refund), owner );
   out.delay_sec = seconds_refund_delay;
   cancel_deferred( owner ); // TODO: Remove this line when replacing deferred trxs is fixed
   out.send( owner, owner, true );
@@ -191,7 +191,7 @@ void token::claim( account_name owner ) {
 }
 
 void token::refund( account_name owner ) {
-  require_auth( owner );
+  //require_auth( owner );
   //eosio::print("Attempting refund"); //TODO Remove
   refunding owner_refund( _self, owner );
   const auto& from = owner_refund.get( token::SYMBOL.name(), "no KARMA refund found" );
@@ -260,7 +260,7 @@ void token::do_claim( account_name owner, bool prorate ) {
   // eosio::print("Reward: ", reward,"\n"); //TODO Remove
 
   action(
-    permission_level{ _self, N(active) },
+    permission_level{ _self, N(notify) },
     _self, N(rewarded),
     std::make_tuple(owner, asset(reward,token::SYMBOL), memo)
   ).send();
